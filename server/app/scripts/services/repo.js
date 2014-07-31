@@ -1,45 +1,24 @@
 'use strict';
 
+angular.module('app').config(['RestangularProvider', function(RestangularProvider) {
+	RestangularProvider.addElementTransformer('repos', false, function(repo) {
+		repo.addRestangularMethod('withAdminDetails', 'get', undefined, {'admin': 1});
+		return building;
+	});
+}]);
+
 // Service facilitates interaction with the repository API.
-angular.module('app').service('repos', ['$q', '$http', function($q, $http) {
+angular.module('app').factory('repos', ['Restangular', function(Restangular) {
+	var resource = Restangular.all('repos');
 
-	// Gets a repository by host, owner and name.
-	// @deprecated
-	this.getRepo = function(host, owner, name) {
-			var defer = $q.defer();
-			var route = '/v1/repos/'+host+'/'+owner+'/'+name;
-			$http.get(route).success(function(data){
-				defer.resolve(data);
-			});
-			return defer.promise;
+	var api = {
+		getResource: function() {
+			return resource;
+		},
+		getOneByHostOwnerName: function(host, owner, name) {
+			return resource.all(host).all(owner).one(name);
+		}
 	};
 
-	// Gets a repository by host, owner and name.
-	this.get = function(host, owner, name) {
-		return $http.get('/v1/repos/'+host+'/'+owner+'/'+name);
-	};
-
-	// Gets a repository by host, owner and name.
-	this.feed = function(host, owner, name) {
-		return $http.get('/v1/repos/'+host+'/'+owner+'/'+name+'/feed');
-	};
-
-	// Updates an existing repository
-	this.update = function(repo) {
-		// todo(bradrydzewski) add repo to the request body
-		return $http.post('/v1/repos/'+repo.host+'/'+repo.owner+'/'+repo.name);
-	};
-
-	// Activates a repository on the backend, registering post-commit
-	// hooks with the remote hosting service (ie github).
-	this.activate = function(repo) {
-		// todo(bradrydzewski) add repo to the request body
-		return $http.post('/v1/repos/'+repo.host+'/'+repo.owner+'/'+repo.name);
-	};
-
-	// Deactivate a repository sets the active flag to false, instructing
-	// the system to ignore all post-commit hooks for the repository.
-	this.deactivate = function(repo) {
-		return $http.delete('/v1/repos/'+repo.host+'/'+repo.owner+'/'+repo.name);
-	};
+  return api;
 }]);

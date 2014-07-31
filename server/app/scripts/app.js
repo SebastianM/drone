@@ -2,7 +2,8 @@
 
 var app = angular.module('app', [
   'ngRoute',
-  'ui.filters'
+  'ui.filters',
+  'restangular'
 ]);
 
 app.config(['$routeProvider', '$locationProvider', function($routeProvider, $locationProvider) {
@@ -121,15 +122,13 @@ app.config(['$routeProvider', '$locationProvider', function($routeProvider, $loc
 			controller: 'RepoController',
 			title: 'Recent Commits',
 			resolve: {
-				user: function(authService) {
+				user: ['authService', function(authService) {
 					return authService.getUser();
-				},
-				repo: function($route, repos) {
-					var remote = $route.current.params.remote;
-					var owner  = $route.current.params.owner;
-					var name   = $route.current.params.name;
-					return repos.getRepo(remote, owner, name);
-				}
+				}],
+				repo: ['$route', 'repos', function($route, repos) {
+					var currentRoute = $route.current.params;
+					return repos.getOneByHostOwnerName(currentRoute.remote, currentRoute.owner, currentRoute.name).get();
+				}]
 			}
 		});
 
@@ -148,6 +147,10 @@ app.run(['$location', '$rootScope', '$routeParams', 'feed', 'stdout', function($
     $rootScope.$on('$routeChangeSuccess', function (event, current, previous) {
         document.title = current.$$route.title + ' · drone.io';
     });
+}]);
+
+app.config(['RestangularProvider', function(RestangularProvider) {
+	RestangularProvider.setBaseUrl('/v1');
 }]);
 
 

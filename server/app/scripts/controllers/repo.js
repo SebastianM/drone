@@ -5,6 +5,7 @@ angular.module('app').controller("RepoController", function($scope, $http, $rout
 
 	// subscribes to the global feed to receive
 	// build status updates.
+	// todo(sebastianm): use $rootScope events in feed service to get rid of $scope.$apply() here
 	feed.subscribe(function(item) {
 		if (item.repo.host  == repo.host  &&
 			item.repo.owner == repo.owner &&
@@ -23,14 +24,13 @@ angular.module('app').controller("RepoController", function($scope, $http, $rout
 
 
 	// load the repo commit feed
-	repos.feed(repo.host, repo.owner, repo.name).success(function (feed) {
-			$scope.commits = (typeof feed==='string')?[]:feed;
-			$scope.state = 1;
-		})
-		.error(function (error) {
-			$scope.commits = undefined;
-			$scope.state = 1;
-		});
+	repo.customGET('feed').then(function (feed) {
+		$scope.commits = (typeof feed==='string')?[]:feed;
+		$scope.state = 1;
+	}, function (error) {
+		$scope.commits = undefined;
+		$scope.state = 1;
+	});
 
 	//$http({method: 'GET', url: '/v1/repos/'+repo.host+'/'+repo.owner+"/"+repo.name+"/feed"}).
 	//	success(function(data, status, headers, config) {
@@ -42,13 +42,12 @@ angular.module('app').controller("RepoController", function($scope, $http, $rout
 
 	$scope.activate = function() {
 		// request to create a new repository
-		$http({method: 'POST', url: '/v1/repos/'+repo.host+'/'+repo.owner+"/"+repo.name }).
-			success(function(data, status, headers, config) {
-				$scope.repo = data;
-			}).
-			error(function(data, status, headers, config) {
-				$scope.failure = data;
-			});
+		repo.post().then(function(repo) {
+			$scope.repo = repo;
+			delete $scope.failure;
+		}, function() {
+			$scope.failure = data;
+		});
 	};
 
 
@@ -65,36 +64,29 @@ angular.module('app').controller("RepoController", function($scope, $http, $rout
 	//		});
 	//};
 
-});
+})
 
-
-
-
-angular.module('app').controller("RepoConfigController", function($scope, $http, $routeParams, user) {
+.controller('RepoConfigController', ['$scope', '$routeParams', 'user', 'repos', function($scope, $http, $routeParams, user, repos) {
 	$scope.user = user;
-
-	var remote = $routeParams.remote;
-	var owner  = $routeParams.owner;
-	var name   = $routeParams.name;
 
 	// load the repo meta-data
 	// request admin details for the repository as well.
-	$http({method: 'GET', url: '/v1/repos/'+remote+'/'+owner+"/"+name+"?admin=1"}).
-		success(function(data, status, headers, config) {
-			$scope.repo = data;
-		}).
-		error(function(data, status, headers, config) {
-			console.log(data);
-		});
+	// todo(sebastianm): move this in route resolve block, cause this is needed for displaying a useful page
+	var repo = repos.getOneByHostOwnerName($routeParams.remote, $routeParams.owner, $routeParams.name).withAdminDetails();
+
+	repo.then(function(data) {
+		$scope.repo = data;
+	}, function(data) {
+		// todo(sebastianm): add better error handling
+		console.error(data);
+	});
 
 	$scope.save = function() {
 		// request to create a new repository
-		$http({method: 'PUT', url: '/v1/repos/'+remote+'/'+owner+"/"+name, data: $scope.repo }).
-			success(function(data, status, headers, config) {
-				delete $scope.failure;
-			}).
-			error(function(data, status, headers, config) {
-				$scope.failure = data;
-			});
+		$scope.repo.put().then(function() {
+			delete $scope.failure;
+		}, function(data) {
+			$scope.failure = data;
+		});
 	};
-});
+}]);
